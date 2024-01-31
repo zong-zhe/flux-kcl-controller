@@ -1,5 +1,5 @@
 # Image URL to use all building/pushing image targets
-IMG ?= ghcr.io/kcl-lang/kcl-controller:latest
+IMG ?= ghcr.io/zong-zhe/kcl-controller:latest
 # Produce CRDs that work back to Kubernetes 1.16
 CRD_OPTIONS ?= crd:crdVersions=v1
 
@@ -27,11 +27,11 @@ test: generate tidy fmt vet manifests install-envtest
 
 # Build manager binary
 manager: generate fmt vet
-	go build -o bin/manager main.go
+	go build -o bin/manager cmd/main.go
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate fmt vet manifests
-	go run ./main.go
+	go run ./cmd/main.go
 
 # Install CRDs into a cluster
 install: manifests
@@ -81,7 +81,7 @@ docker-push:
 manifests-release:
 	mkdir -p ./build
 	mkdir -p config/release-tmp && cp config/release/* config/release-tmp
-	cd config/release-tmp && kustomize edit set image kcl-lang/kcl-controller=${IMG}
+	cd config/release-tmp && kustomize edit set image zong-zhe/kcl-controller=${IMG}
 	kustomize build config/release-tmp > ./build/kcl-controller.deployment.yaml
 	rm -rf config/release-tmp
 

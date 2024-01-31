@@ -1,8 +1,8 @@
+resources:
+- manager.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-resources:
-- deployment.yaml
 images:
 - name: kcl-controller
-  newName: ghcr.io/kcl-lang/kcl-controller
+  newName: ghcr.io/zong-zhe/kcl-controller
   newTag: latest
