@@ -56,7 +56,6 @@ func (r *KCLRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	)
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&v1alpha1.KCLRun{}).
 		For(&sourcev1.GitRepository{}, builder.WithPredicates(sw.GitRepositoryRevisionChangePredicate{})).
 		Complete(r)
 }
@@ -64,6 +63,7 @@ func (r *KCLRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
 //+kubebuilder:rbac:groups=krm.kcl.dev.fluxcd,resources=kclruns,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=krm.kcl.dev.fluxcd,resources=kclruns/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=krm.kcl.dev.fluxcd,resources=kclruns/finalizers,verbs=update
+//+kubebuilder:rbac:groups=source.toolkit.fluxcd.io,resources=ocirepositories;gitrepositories,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
