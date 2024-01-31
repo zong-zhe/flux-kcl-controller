@@ -57,7 +57,7 @@ spec:
       #             values:
       #               - linux
       securityContext:
-        runAsNonRoot: true
+        runAsNonRoot: false
         # TODO(user): For common cases that do not require escalating privileges
         # it is recommended to ensure that all your Pods/Containers are restrictive.
         # More info: https://kubernetes.io/docs/concepts/security/pod-security-standards/#restricted
@@ -66,12 +66,11 @@ spec:
         # seccompProfile:
         #   type: RuntimeDefault
       containers:
-      - command:
-        - /manager
+      - name: manager
         args:
         - --leader-elect
         image: ghcr.io/zong-zhe/kcl-controller:latest
-        name: manager
+        imagePullPolicy: Always
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

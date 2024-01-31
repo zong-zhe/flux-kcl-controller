@@ -11,7 +11,7 @@ metadata:
     app.kubernetes.io/part-of: kcl-controller
     app.kubernetes.io/managed-by: kustomize
   name: kcl-controller-metrics-monitor
-  namespace: system
+  namespace: source-system
 spec:
   endpoints:
     - path: /metrics

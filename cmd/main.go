@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
+	sourcev1 "github.com/fluxcd/source-controller/api/v1"
 	krmkcldevv1alpha1 "github.com/kcl-lang/flux-kcl-controller/api/v1alpha1"
 	"github.com/kcl-lang/flux-kcl-controller/internal/controller"
 	//+kubebuilder:scaffold:imports
@@ -46,6 +47,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(krmkcldevv1alpha1.AddToScheme(scheme))
+	_ = sourcev1.AddToScheme(scheme)
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -71,7 +73,7 @@ func main() {
 		Metrics:                metricsserver.Options{BindAddress: metricsAddr},
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "321443c7.krm.kcl.dev.fluxcd",
+		LeaderElectionID:       "kcl-lang.io",
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly

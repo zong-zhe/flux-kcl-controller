@@ -56,6 +56,7 @@ func (r *KCLRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	)
 
 	return ctrl.NewControllerManagedBy(mgr).
+		For(&v1alpha1.KCLRun{}).
 		For(&sourcev1.GitRepository{}, builder.WithPredicates(sw.GitRepositoryRevisionChangePredicate{})).
 		Complete(r)
 }
