@@ -36,6 +36,11 @@ type KCLRunSpec struct {
 type KCLRunStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	// LastAttemptedRevision is the revision of the last reconciliation attempt.
+	// +optional
+	LastAttemptedRevision string `json:"lastAttemptedRevision,omitempty"`
+	Phase                 string `json:"phase,omitempty"`
 }
 
 //+kubebuilder:object:root=true

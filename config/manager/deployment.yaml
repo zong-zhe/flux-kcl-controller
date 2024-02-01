@@ -20,7 +20,7 @@ spec:
       terminationGracePeriodSeconds: 10
       containers:
         - name: manager
-          image: ghcr.io/kcl-lang/kcl-controller:latest
+          image: ghcr.io/zong-zhe/kcl-controller:0.0.9
           imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false
