@@ -5,4 +5,4 @@ resources:
 images:
 - name: kcl-controller
   newName: ghcr.io/zong-zhe/kcl-controller
-  newTag: 0.0.9
+  newTag: 0.0.10

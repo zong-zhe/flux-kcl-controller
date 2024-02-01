@@ -132,6 +132,11 @@ func (r *KCLRunReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	log.Info("successfully applied kcl resources")
+	kclRun.Status.LastAttemptedRevision = artifact.Revision
+	kclRun.Status.Phase = "Ready"
+	if err := r.Status().Update(ctx, &kclRun); err != nil {
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -203,10 +208,32 @@ func (r *KCLRunReconciler) requestsForRevisionChangeOf() handler.MapFunc {
 			return nil
 		}
 
-		// TODO: Only the same name and namespace is supported for now
-		reqs := make([]reconcile.Request, 1)
-		reqs[0].NamespacedName.Name = obj.GetName()
-		reqs[0].NamespacedName.Namespace = obj.GetNamespace()
+		var list v1alpha1.KCLRunList
+		if err := r.List(ctx, &list, client.MatchingFields{
+			".metadata.gitRepository": client.ObjectKeyFromObject(obj).String(),
+		}); err != nil {
+			log.Error(err, "failed to list objects for revision change")
+			return nil
+		}
+		log.Info(fmt.Sprintf("found %d objects for revision change", len(list.Items)))
+
+		var reqs []reconcile.Request
+		for _, d := range list.Items {
+			// If the Kustomization is ready and the revision of the artifact equals
+			// to the last attempted revision, we should not make a request for this Kustomization
+			if repo.GetArtifact().HasRevision(d.Status.LastAttemptedRevision) {
+				continue
+			}
+			log.Info(fmt.Sprintf("revision of %s/%s changed", repo.GetArtifact().Revision, d.Status.LastAttemptedRevision))
+			log.Info(fmt.Sprintf("enqueueing %s/%s for revision change", d.GetNamespace(), d.GetName()))
+			reqs = append(reqs, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: d.GetNamespace(),
+					Name:      d.GetName(),
+				},
+			})
+		}
+
 		return reqs
 	}
 }
