@@ -66,6 +66,13 @@ spec:
             type: object
           status:
             description: KCLRunStatus defines the observed state of KCLRun
+            properties:
+              lastAttemptedRevision:
+                description: LastAttemptedRevision is the revision of the last reconciliation
+                  attempt.
+                type: string
+              phase:
+                type: string
             type: object
         type: object
     served: true
