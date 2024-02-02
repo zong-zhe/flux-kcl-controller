@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -26,7 +27,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -48,8 +48,10 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 var cfg *rest.Config
-var k8sClient client.Client
 var testEnv *envtest.Environment
+var k8sClient *TestClient
+var timeout = time.Second * 100
+var interval = time.Millisecond * 250
 
 func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -75,6 +77,9 @@ var _ = BeforeSuite(func() {
 	}
 
 	var err error
+	// Set the USE_EXISTING_CLUSTER environment variable to true to use an existing cluster.
+	err = os.Setenv("USE_EXISTING_CLUSTER", "true")
+	Expect(err).NotTo(HaveOccurred())
 	// cfg is defined in this file globally.
 	cfg, err = testEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
@@ -87,10 +92,16 @@ var _ = BeforeSuite(func() {
 
 	//+kubebuilder:scaffold:scheme
 
-	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
+	client, err := client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
-	Expect(k8sClient).NotTo(BeNil())
+	Expect(client).NotTo(BeNil())
 
+	k8sClient = &TestClient{
+		Client:   client,
+		Ctx:      context.Background(),
+		Timeout:  timeout,
+		Interval: interval,
+	}
 })
 
 var _ = AfterSuite(func() {
@@ -100,36 +111,55 @@ var _ = AfterSuite(func() {
 })
 
 var _ = Describe("create kclrun", func() {
-	pool := &v1alpha1.KCLRun{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "testcreate",
-			Namespace: "default",
-		},
-		Spec: v1alpha1.KCLRunSpec{
-			SourceRef: kc.CrossNamespaceSourceReference{
-				Kind: "GitRepository",
-				Name: "test",
-			},
-		},
-	}
+
+	const (
+		testNameSpace = "testkclrun"
+		timeout       = time.Second * 100
+		interval      = time.Millisecond * 250
+	)
+
+	BeforeEach(func() {
+		Expect(k8sClient.CleanNamespace(testNameSpace)).NotTo(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		Expect(k8sClient.CleanNamespace(testNameSpace)).NotTo(HaveOccurred())
+	})
 
 	It("create kclrun", func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		pool := &v1alpha1.KCLRun{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "testcreate",
+				Namespace: testNameSpace,
+			},
+			Spec: v1alpha1.KCLRunSpec{
+				SourceRef: kc.CrossNamespaceSourceReference{
+					Kind: "GitRepository",
+					Name: testNameSpace,
+				},
+			},
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		err := k8sClient.Create(ctx, pool)
 		Expect(err).NotTo(HaveOccurred())
 	})
 })
 
-var _ = Describe("CD deployment", func() {
-	// Define utility constants for object names and testing timeouts/durations and intervals.
+var _ = Describe("gitdeploy", func() {
 	const (
-		DeploymentName      = "test"
-		DeploymentNamespace = "default"
-
-		timeout  = time.Second * 10
-		interval = time.Millisecond * 250
+		testNameSpace = "test-deploy-cd"
+		timeout       = time.Second * 100
+		interval      = time.Millisecond * 250
 	)
+
+	BeforeEach(func() {
+		Expect(k8sClient.CleanNamespace(testNameSpace)).NotTo(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		Expect(k8sClient.RmNamespace(testNameSpace)).NotTo(HaveOccurred())
+	})
 
 	Context("When creating KCLRun and GitRepositry", func() {
 		It("Should create corresponding Deployment", func() {
@@ -138,7 +168,7 @@ var _ = Describe("CD deployment", func() {
 			kclRun := &v1alpha1.KCLRun{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test",
-					Namespace: "default",
+					Namespace: testNameSpace,
 				},
 				Spec: v1alpha1.KCLRunSpec{
 					SourceRef: kc.CrossNamespaceSourceReference{
@@ -152,7 +182,7 @@ var _ = Describe("CD deployment", func() {
 			gitRepo := &sourcev1.GitRepository{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test",
-					Namespace: "default",
+					Namespace: testNameSpace,
 				},
 				Spec: sourcev1.GitRepositorySpec{
 					URL:      "https://github.com/awesome-kusion/kcl-deployment.git",
@@ -164,7 +194,39 @@ var _ = Describe("CD deployment", func() {
 			}
 			Expect(k8sClient.Create(ctx, gitRepo)).Should(Succeed())
 
-			deploymentLookupKey := types.NamespacedName{Name: DeploymentName, Namespace: DeploymentNamespace}
+			deploymentLookupKey := types.NamespacedName{Name: "nginx-deployment-6", Namespace: "default"}
+			createdDeployment := &appsv1.Deployment{}
+
+			// We'll need to retry getting this newly created Deployment, given that creation may not immediately happen.
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, deploymentLookupKey, createdDeployment)
+				return err == nil
+			}, timeout, interval).Should(BeTrue())
+		})
+	})
+})
+
+var _ = Describe("getd", func() {
+	const (
+		testNameSpace = "test-deploy-cd"
+		timeout       = time.Second * 100
+		interval      = time.Millisecond * 250
+	)
+
+	BeforeEach(func() {
+		Expect(k8sClient.CleanNamespace(testNameSpace)).NotTo(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		Expect(k8sClient.RmNamespace(testNameSpace)).NotTo(HaveOccurred())
+	})
+
+	Context("When creating KCLRun and GitRepositry", func() {
+		It("Should create corresponding Deployment", func() {
+			By("By creating a new KCLRun")
+			ctx := context.Background()
+
+			deploymentLookupKey := types.NamespacedName{Name: "nginx-deployment-6", Namespace: "default"}
 			createdDeployment := &appsv1.Deployment{}
 
 			// We'll need to retry getting this newly created Deployment, given that creation may not immediately happen.
