@@ -35,7 +35,9 @@ import (
 	// "sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/fluxcd/pkg/apis/meta"
 	"github.com/fluxcd/pkg/http/fetch"
+	"github.com/fluxcd/pkg/runtime/conditions"
 	"github.com/fluxcd/pkg/runtime/predicates"
 
 	// "github.com/fluxcd/pkg/runtime/predicates"
@@ -84,17 +86,22 @@ func (r *KCLRunReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	artifact := source.GetArtifact()
-	log.Info(fmt.Sprintf("new revision detected %s", artifact.Revision))
+	progressingMsg := fmt.Sprintf("new revision detected %s", artifact.Revision)
+	log.Info(progressingMsg)
+	conditions.MarkUnknown(&kclRun, meta.ReadyCondition, meta.ProgressingReason, "Reconciliation in progress")
+	conditions.MarkReconciling(&kclRun, meta.ProgressingReason, progressingMsg)
 
 	// create tmp dir
 	tmpDir, err := os.MkdirTemp("", kclRun.Name)
 	if err != nil {
+		conditions.MarkFalse(&kclRun, meta.ReadyCondition, sourcev1.DirCreationFailedReason, err.Error())
 		return ctrl.Result{}, fmt.Errorf("failed to create temp dir, error: %w", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
 	// download and extract artifact
 	if err := r.artifactFetcher.Fetch(artifact.URL, artifact.Digest, tmpDir); err != nil {
+		conditions.MarkFalse(&kclRun, meta.ReadyCondition, "failed fetch artifacts", err.Error())
 		log.Error(err, "unable to fetch artifact")
 		return ctrl.Result{}, err
 	}
@@ -106,12 +113,14 @@ func (r *KCLRunReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	)
 
 	if err != nil {
+		conditions.MarkFalse(&kclRun, meta.ReadyCondition, "FetchFailed", err.Error())
 		log.Error(err, "failed to compile the KCL source code")
 		return ctrl.Result{}, err
 	}
 
 	u, err := ssa.ReadObjects(bytes.NewReader(([]byte(res.GetRawYamlResult()))))
 	if err != nil {
+		conditions.MarkFalse(&kclRun, meta.ReadyCondition, "CompileFailed", err.Error())
 		log.Error(err, "failed to compile the yaml str into kubernetes manifests")
 		return ctrl.Result{}, err
 	}
@@ -127,13 +136,19 @@ func (r *KCLRunReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	_, err = rm.ApplyAll(ctx, u, ssa.DefaultApplyOptions())
 	if err != nil {
+		conditions.MarkFalse(&kclRun, meta.ReadyCondition, "ApplyFailed", err.Error())
 		err = fmt.Errorf("failed to run server-side apply: %w", err)
 		return ctrl.Result{}, err
 	}
 
 	log.Info("successfully applied kcl resources")
 	kclRun.Status.LastAttemptedRevision = artifact.Revision
-	kclRun.Status.Phase = "Ready"
+
+	conditions.MarkTrue(&kclRun,
+		meta.ReadyCondition,
+		"ReconciliationSucceeded",
+		fmt.Sprintf("Applied revision: %s", artifact.Revision))
+
 	if err := r.Status().Update(ctx, &kclRun); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -218,10 +233,10 @@ func (r *KCLRunReconciler) requestsForRevisionChangeOf() handler.MapFunc {
 		log.Info(fmt.Sprintf("found %d objects for revision change", len(list.Items)))
 
 		var reqs []reconcile.Request
-		for _, d := range list.Items {
+		for i, d := range list.Items {
 			// If the Kustomization is ready and the revision of the artifact equals
 			// to the last attempted revision, we should not make a request for this Kustomization
-			if repo.GetArtifact().HasRevision(d.Status.LastAttemptedRevision) {
+			if conditions.IsReady(&list.Items[i]) && repo.GetArtifact().HasRevision(d.Status.LastAttemptedRevision) {
 				continue
 			}
 			log.Info(fmt.Sprintf("revision of %s/%s changed", repo.GetArtifact().Revision, d.Status.LastAttemptedRevision))
