@@ -31,6 +31,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"kcl-lang.io/kcl-go/pkg/kcl"
+	kclapi "kcl-lang.io/kpm/pkg/api"
+	kclcli "kcl-lang.io/kpm/pkg/client"
+	"kcl-lang.io/kpm/pkg/opt"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -234,6 +238,38 @@ var _ = Describe("getd", func() {
 				err := k8sClient.Get(ctx, deploymentLookupKey, createdDeployment)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
+		})
+	})
+})
+
+var _ = Describe("compile", func() {
+	const (
+		testNameSpace = "test-deploy-cd"
+		timeout       = time.Second * 100
+		interval      = time.Millisecond * 250
+	)
+
+	Context("When creating KCLRun and GitRepositry", func() {
+		It("Should create corresponding Deployment", func() {
+			By("By creating a new KCLRun")
+			// compile the KCL source code into the kubenretes manifests
+
+			opts := opt.DefaultCompileOptions()
+			opts.SetHasSettingsYaml(true)
+
+			res, err := kclapi.RunWithOpts(
+				opt.WithKclOption(kcl.WithWorkDir("/Users/zongz/Workspace/learn/kcl_learn/kcl-deployment/flask-demo-kcl-manifests")),
+				opt.WithKclOption(kcl.WithSettings("/Users/zongz/Workspace/learn/kcl_learn/kcl-deployment/flask-demo-kcl-manifests/kcl.yaml")),
+			)
+
+			kpmcli, _ := kclcli.NewKpmClient()
+			opts.SetHasSettingsYaml(true)
+			opts.SetPkgPath("/Users/zongz/Workspace/learn/kcl_learn/kcl-deployment/flask-demo-kcl-manifests")
+			opts.Option.Merge(kcl.WithSettings("/Users/zongz/Workspace/learn/kcl_learn/kcl-deployment/flask-demo-kcl-manifests/kcl.yaml"))
+			res, err = kpmcli.CompileWithOpts(opts)
+
+			Expect(err).NotTo(HaveOccurred())
+			fmt.Printf("res: %v\n", res)
 		})
 	})
 })

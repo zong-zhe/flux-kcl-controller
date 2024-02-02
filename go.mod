@@ -100,6 +100,7 @@ require (
 	google.golang.org/grpc v1.56.3 // indirect
 	gopkg.in/evanphx/json-patch.v5 v5.7.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
+	gotest.tools/v3 v3.5.1 // indirect
 	k8s.io/cli-runtime v0.28.4 // indirect
 	k8s.io/kubectl v0.28.4 // indirect
 	kcl-lang.io/lib v0.7.8 // indirect
