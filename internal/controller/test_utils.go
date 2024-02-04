@@ -61,8 +61,8 @@ func (c *TestClient) CreateNamespace(namespace string) error {
 func (c *TestClient) CleanNamespace(namespace string) error {
 	var err error
 	err = nil
-	if exist, err := c.NamespaceExists(namespace); err != nil {
-		err = errors.Wrapf(err, "Failed to check if namespace exists: %s", namespace)
+	if exist, terr := c.NamespaceExists(namespace); terr != nil {
+		err = errors.Wrapf(terr, "Failed to check if namespace exists: %s", namespace)
 	} else if exist {
 		err = c.RmNamespace(namespace)
 	}

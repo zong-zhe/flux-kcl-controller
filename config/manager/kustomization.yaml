@@ -4,5 +4,5 @@ resources:
 - deployment.yaml
 images:
 - name: kcl-controller
-  newName: ghcr.io/zong-zhe/kcl-controller
-  newTag: 0.0.11
+  newName: ghcr.io/kcl-lang/kcl-controller
+  newTag: 0.0.12
